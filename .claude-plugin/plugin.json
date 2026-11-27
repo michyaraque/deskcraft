@@ -1,0 +1,22 @@
+{
+  "name": "deskcraft",
+  "version": "1.0.0",
+  "description": "Builds or tunes a commercial desktop app from A to Z: interface, first run, long work, installer, updates, releases, signing and launch",
+  "author": {
+    "name": "Michael Araque",
+    "url": "https://github.com/michyaraque"
+  },
+  "homepage": "https://github.com/michyaraque/deskcraft",
+  "repository": "https://github.com/michyaraque/deskcraft",
+  "documentationUrl": "https://github.com/michyaraque/deskcraft#readme",
+  "termsOfServiceUrl": "https://github.com/michyaraque/deskcraft/blob/master/LICENSE",
+  "license": "MIT",
+  "keywords": [
+    "desktop",
+    "installer",
+    "auto-update",
+    "release",
+    "onboarding",
+    "code-signing"
+  ]
+}

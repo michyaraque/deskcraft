@@ -1,0 +1,12 @@
+{
+  "name": "michyaraque",
+  "owner": { "name": "Michael Araque" },
+  "metadata": { "description": "Skills by Michael Araque" },
+  "plugins": [
+    {
+      "name": "deskcraft",
+      "source": "./",
+      "description": "Builds or tunes a commercial desktop app from A to Z: interface, first run, long work, installer, updates, releases, signing and launch"
+    }
+  ]
+}
