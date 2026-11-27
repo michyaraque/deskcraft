@@ -1,0 +1,33 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Manifests are valid JSON with the fields the directory needs
+        run: |
+          jq -e '.name and .version and .description' .claude-plugin/plugin.json > /dev/null
+          file .claude-plugin/icon.png | grep -q 'PNG image data, 1024 x 1024'
+          jq -e '.name and .owner.name and (.plugins | length > 0)' .claude-plugin/marketplace.json > /dev/null
+      - name: Links between documents point at files that exist
+        run: |
+          status=0
+          while IFS= read -r doc; do
+            dir=$(dirname "$doc")
+            grep -o -E '\]\([^)#]+' "$doc" | sed 's/^](//' | grep -v -E '^(https?:|mailto:)' | while IFS= read -r link; do
+              [ -e "$dir/$link" ] || { echo "$doc: missing $link"; exit 1; }
+            done || status=1
+          done < <(git ls-files '*.md')
+          exit $status
+      - name: The plugin ships only text, JSON, YAML and images
+        run: |
+          bad=$(git ls-files skills .claude-plugin | grep -v -E '\.(md|txt|json|ya?ml|png|jpe?g|gif|webp|ico)$' || true)
+          [ -z "$bad" ] || { echo "not allowed in the plugin:"; echo "$bad"; exit 1; }
