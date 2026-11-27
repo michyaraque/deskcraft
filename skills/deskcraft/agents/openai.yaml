@@ -1,0 +1,4 @@
+interface:
+  display_name: "deskcraft"
+  short_description: "Build or tune a commercial desktop app from A to Z"
+  default_prompt: "Use $deskcraft to audit this desktop app and get it ready to ship."
