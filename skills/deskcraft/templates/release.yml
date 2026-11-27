@@ -1,0 +1,95 @@
+# Release on version bump: copy to .github/workflows/release.yml and fill the three marked places.
+# A push to the default branch whose version has no release yet builds every package, then publishes
+# "App vX.Y.Z" (tag vX.Y.Z) with the CHANGELOG section, a download guide and SHA256SUMS.txt.
+name: Release
+
+on:
+  push:
+    branches: [master] # the repository's default branch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 1. read the version from its one source (Cargo.toml shown; package.json: jq -r .version package.json)
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          tag="v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" > /dev/null 2>&1; then echo "new=false" >> "$GITHUB_OUTPUT"; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
+
+  build:
+    needs: version
+    if: needs.version.outputs.new == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022, package: windows }
+          - { os: macos-14, package: macos }
+          - { os: ubuntu-24.04, package: linux }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # 2. set up the toolchain with its cache (actions/setup-node with cache, dtolnay/rust-toolchain +
+      #    Swatinem/rust-cache, actions/setup-dotnet ...), and the signing secrets when you have them
+      - name: Package
+        shell: bash
+        # 3. the same packaging script you run locally; it writes dist/App-<version>-<platform>...
+        run: ./scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.package }}
+          path: dist/App-*
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and release notes
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          v="${TAG#v}"
+          (cd dist && sha256sum App-* > SHA256SUMS.txt)
+          # the version's section of CHANGELOG.md, without its header; a release without notes fails here
+          awk -v h="## [$v]" 'index($0, h) == 1 { found = 1; next } found && /^## / { exit } found' CHANGELOG.md | sed '/./,$!d' > notes.md
+          test -s notes.md || { echo "no CHANGELOG section for $v"; exit 1; }
+          {
+            echo
+            echo "## Download"
+            echo
+            echo "- **App-$v-setup.exe**: Windows 10 and 11, 64-bit."
+            echo "- **App-$v.dmg**: macOS 13 or newer, Apple silicon and Intel."
+            echo "- **App-$v.AppImage**: Linux, x86_64."
+            echo
+            echo "Check a download with \`sha256sum -c SHA256SUMS.txt --ignore-missing\`."
+          } >> notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: gh release create "$TAG" --target "$GITHUB_SHA" --title "App $TAG" --notes-file notes.md --generate-notes dist/*
